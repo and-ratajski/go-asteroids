@@ -1,4 +1,4 @@
-package main
+package goasteroids
 
 import (
 	"go-asteroids/assets"
@@ -17,14 +17,14 @@ const (
 var curtAcceleration float64
 
 type Player struct {
-	game     *Game
+	game     *GameScene
 	sprite   *ebiten.Image
 	position Vector
 	rotation float64
 	velocity float64
 }
 
-func NewPlayer(game *Game) *Player {
+func NewPlayer(game *GameScene) *Player {
 	sprite := assets.PlayerSprite
 
 	// Center player on screen
