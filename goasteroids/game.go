@@ -15,7 +15,10 @@ func (i *Input) Update() {}
 func (g *Game) Update() error {
 	if g.sceneManager == nil {
 		g.sceneManager = &SceneManager{}
-		g.sceneManager.GoToScene(&TitleScene{})
+		asteroids := make(map[int]*Asteroid)
+		g.sceneManager.GoToScene(&TitleScene{
+			asteroids: asteroids,
+		})
 	}
 
 	g.input.Update() // Allows keystrokes go to various scenes

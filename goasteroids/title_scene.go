@@ -7,10 +7,12 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
-	"golang.org/x/image/font"
 )
 
-type TitleScene struct{}
+type TitleScene struct {
+	asteroids     map[int]*Asteroid
+	asteroidCount int
+}
 
 func (t *TitleScene) Draw(screen *ebiten.Image) {
 	textToDraw := "1 coin 1 play"
@@ -25,16 +27,27 @@ func (t *TitleScene) Draw(screen *ebiten.Image) {
 		Source: assets.TitleFont,
 		Size:   48,
 	}, op)
+
+	for _, a := range t.asteroids {
+		a.Draw(screen)
+	}
 }
 
 func (t *TitleScene) Update(state *State) error {
 	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 		state.SceneManager.GoToScene(NewGameScene())
+		return nil
 	}
-	return nil
-}
 
-func widthOfText(f font.Face, t string) int {
-	_, textWidth := font.BoundString(f, t)
-	return textWidth.Round()
+	if len(t.asteroids) < 10 {
+		a := NewAsteroid(0.25, &GameScene{}, len(t.asteroids)-1)
+		t.asteroidCount++
+		t.asteroids[t.asteroidCount] = a
+	}
+
+	for _, a := range t.asteroids {
+		a.Update()
+	}
+
+	return nil
 }

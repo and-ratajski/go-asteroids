@@ -14,8 +14,24 @@ import (
 //go:embed *
 var assets embed.FS
 
-var PlayerSprite = mustLoadImage("images/player.png")
 var TitleFont = mustLoadFontFace("fonts/title.ttf")
+var PlayerSprite = mustLoadImage("images/player.png")
+var AsteroidsSprites = mustLoadImages("images/meteors/*.png") // Asteroids imgs are called Meteors...
+var AsteroidsSpritesSmall = mustLoadImages("images/meteors-small/*.png")
+
+func mustLoadImages(path string) []*ebiten.Image {
+	matches, err := fs.Glob(assets, path)
+	if err != nil {
+		panic(err)
+	}
+
+	images := make([]*ebiten.Image, len(matches))
+	for i, match := range matches {
+		images[i] = mustLoadImage(match)
+	}
+
+	return images
+}
 
 func mustLoadImage(name string) *ebiten.Image {
 	f, err := assets.Open(name)
