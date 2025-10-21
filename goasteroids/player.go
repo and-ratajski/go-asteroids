@@ -3,6 +3,7 @@ package goasteroids
 import (
 	"go-asteroids/assets"
 	"math"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/solarlune/resolv"
@@ -13,17 +14,24 @@ const (
 	maxAcceleration   = 8.0
 	ScreenWidth       = 1280
 	ScreenHeight      = 720 // 16:9 aspect ratio
+	shootCoolDown     = 150 * time.Millisecond
+	burstCoolDown     = 500 * time.Millisecond
+	laserSpawnOffset  = 50.0
+	maxShotsPerBurst  = 3
 )
 
 var curtAcceleration float64
+var shotsFired = 0
 
 type Player struct {
-	game         *GameScene
-	sprite       *ebiten.Image
-	position     Vector
-	rotation     float64
-	velocity     float64
-	collisionObj *resolv.Circle
+	game          *GameScene
+	sprite        *ebiten.Image
+	position      Vector
+	rotation      float64
+	velocity      float64
+	collisionObj  *resolv.Circle
+	shootCoolDown *Timer
+	burstCoolDown *Timer
 }
 
 func NewPlayer(game *GameScene) *Player {
@@ -41,10 +49,12 @@ func NewPlayer(game *GameScene) *Player {
 	collisionObj := resolv.NewCircle(pos.X, pos.Y, float64(sprite.Bounds().Dx()/2))
 
 	p := &Player{
-		sprite:       sprite,
-		game:         game,
-		position:     pos,
-		collisionObj: collisionObj,
+		sprite:        sprite,
+		game:          game,
+		position:      pos,
+		collisionObj:  collisionObj,
+		shootCoolDown: NewTimer(shootCoolDown),
+		burstCoolDown: NewTimer(burstCoolDown),
 	}
 	p.collisionObj.SetPosition(pos.X, pos.Y)
 	p.collisionObj.Tags().Set(TagPlayer)
@@ -79,6 +89,36 @@ func (p *Player) Update() {
 
 	p.accelerate()
 	p.collisionObj.SetPosition(p.position.X, p.position.Y)
+
+	p.burstCoolDown.Update()
+	p.shootCoolDown.Update()
+	p.fireLasers()
+}
+
+func (p *Player) fireLasers() {
+	if p.burstCoolDown.IsReady() {
+		if p.shootCoolDown.IsReady() && ebiten.IsKeyPressed(ebiten.KeySpace) {
+			p.shootCoolDown.Reset()
+			shotsFired++
+			if shotsFired <= maxShotsPerBurst {
+				bound := p.sprite.Bounds()
+				halfW := float64(bound.Dx() / 2)
+				halfH := float64(bound.Dy() / 2)
+
+				spawnPos := Vector{
+					X: p.position.X + halfW + math.Sin(p.rotation)*laserSpawnOffset,
+					Y: p.position.Y + halfH + (-math.Cos(p.rotation))*laserSpawnOffset,
+				}
+				laser := NewLaser(p.game, spawnPos, p.rotation, p.game.laserCount)
+				p.game.lasers[p.game.laserCount] = laser
+				p.game.collisionSpace.Add(laser.collisionObj)
+				p.game.laserCount++
+			} else {
+				p.burstCoolDown.Reset()
+				shotsFired = 0
+			}
+		}
+	}
 }
 
 func (p *Player) accelerate() {

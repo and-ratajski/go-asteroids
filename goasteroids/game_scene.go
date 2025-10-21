@@ -24,6 +24,8 @@ type GameScene struct {
 	asteroidForLevel   int
 	velocityTimer      *Timer
 	collisionSpace     *resolv.Space
+	lasers             map[int]*Laser
+	laserCount         int
 }
 
 func NewGameScene() *GameScene {
@@ -35,6 +37,8 @@ func NewGameScene() *GameScene {
 		asteroidCount:      0,
 		asteroidForLevel:   2,
 		collisionSpace:     resolv.NewSpace(ScreenWidth, ScreenHeight, 16, 16), // simple math gave 16?
+		lasers:             make(map[int]*Laser),
+		laserCount:         0,
 	}
 	g.player = NewPlayer(g)
 	g.collisionSpace.Add(g.player.collisionObj)
@@ -49,6 +53,9 @@ func (g *GameScene) Update(state *State) error {
 	for _, a := range g.asteroids {
 		a.Update()
 	}
+	for _, l := range g.lasers {
+		l.Update()
+	}
 
 	g.speedUpAsteroids()
 	g.isPlayerCollidingWithAsteroid()
@@ -59,6 +66,9 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 	g.player.Draw(screen)
 	for _, a := range g.asteroids {
 		a.Draw(screen)
+	}
+	for _, l := range g.lasers {
+		l.Draw(screen)
 	}
 }
 
