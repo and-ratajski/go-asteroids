@@ -1,9 +1,11 @@
 package goasteroids
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/solarlune/resolv"
 )
 
 const (
@@ -21,6 +23,7 @@ type GameScene struct {
 	asteroids          map[int]*Asteroid
 	asteroidForLevel   int
 	velocityTimer      *Timer
+	collisionSpace     *resolv.Space
 }
 
 func NewGameScene() *GameScene {
@@ -31,8 +34,10 @@ func NewGameScene() *GameScene {
 		asteroids:          make(map[int]*Asteroid),
 		asteroidCount:      0,
 		asteroidForLevel:   2,
+		collisionSpace:     resolv.NewSpace(ScreenWidth, ScreenHeight, 16, 16), // simple math gave 16?
 	}
 	g.player = NewPlayer(g)
+	g.collisionSpace.Add(g.player.collisionObj)
 
 	return g
 }
@@ -46,6 +51,7 @@ func (g *GameScene) Update(state *State) error {
 	}
 
 	g.speedUpAsteroids()
+	g.isPlayerCollidingWithAsteroid()
 	return nil
 }
 
@@ -66,6 +72,7 @@ func (g *GameScene) spawnAsteroids() {
 		g.asteroidSpawnTimer.Reset()
 		if len(g.asteroids) < g.asteroidForLevel && g.asteroidCount < g.asteroidForLevel {
 			a := NewAsteroid(g.baseVelocity, g, len(g.asteroids)-1)
+			g.collisionSpace.Add(a.collisionObj)
 			g.asteroidCount++
 			g.asteroids[g.asteroidCount] = a
 		}
@@ -77,5 +84,14 @@ func (g *GameScene) speedUpAsteroids() {
 	if g.velocityTimer.IsReady() {
 		g.velocityTimer.Reset()
 		g.baseVelocity += asteroidSpeedUpAmount
+	}
+}
+
+func (g *GameScene) isPlayerCollidingWithAsteroid() {
+	for _, a := range g.asteroids {
+		if a.collisionObj.IsIntersecting(g.player.collisionObj) {
+			data := a.collisionObj.Data().(*ObjectData)
+			fmt.Println("Player collided with asteroid of index: ", data.index)
+		}
 	}
 }

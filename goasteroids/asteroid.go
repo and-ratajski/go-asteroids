@@ -6,6 +6,7 @@ import (
 	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/solarlune/resolv"
 )
 
 const (
@@ -22,6 +23,7 @@ type Asteroid struct {
 	angle         float64
 	rotationSpeed float64
 	sprite        *ebiten.Image
+	collisionObj  *resolv.Circle
 }
 
 // NewAsteroid is a factory method to create new (random) asteroid - a pointer to it
@@ -60,6 +62,9 @@ func NewAsteroid(baseVelocity float64, g *GameScene, index int) *Asteroid {
 	// Assign a sprite to the asteroid
 	sprite := assets.AsteroidsSprites[rand.Intn(len(assets.AsteroidsSprites))]
 
+	// Create the collision object
+	collisionObj := resolv.NewCircle(position.X, position.Y, float64(sprite.Bounds().Dx()/2))
+
 	// Create an asteroid object and return
 	a := &Asteroid{
 		game:          g,
@@ -68,7 +73,14 @@ func NewAsteroid(baseVelocity float64, g *GameScene, index int) *Asteroid {
 		rotationSpeed: rotationSpeedMin + rand.Float64()*(rotationSpeedMax-rotationSpeedMin),
 		sprite:        sprite,
 		angle:         angle,
+		collisionObj:  collisionObj,
 	}
+
+	// Fill collision object data
+	a.collisionObj.SetPosition(position.X, position.Y)
+	a.collisionObj.Tags().Set(TagAsteroid | TagLarge)
+	a.collisionObj.SetData(&ObjectData{index: index})
+
 	return a
 }
 
@@ -81,6 +93,7 @@ func (a *Asteroid) Update() {
 	a.rotation += a.rotationSpeed
 
 	a.keepOnScreen()
+	a.collisionObj.SetPosition(a.position.X, a.position.Y)
 }
 
 func (a *Asteroid) Draw(screem *ebiten.Image) {
@@ -101,14 +114,18 @@ func (a *Asteroid) Draw(screem *ebiten.Image) {
 func (a *Asteroid) keepOnScreen() {
 	if a.position.X >= float64(ScreenWidth) {
 		a.position.X = 0
+		a.collisionObj.SetPosition(0, a.position.Y)
 	}
 	if a.position.X < 0 {
 		a.position.X = ScreenWidth
+		a.collisionObj.SetPosition(ScreenWidth, a.position.Y)
 	}
 	if a.position.Y >= float64(ScreenHeight) {
 		a.position.Y = 0
+		a.collisionObj.SetPosition(a.position.X, 0)
 	}
 	if a.position.Y < 0 {
 		a.position.Y = ScreenHeight
+		a.collisionObj.SetPosition(a.position.X, ScreenHeight)
 	}
 }

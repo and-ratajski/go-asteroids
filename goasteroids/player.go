@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/solarlune/resolv"
 )
 
 const (
@@ -17,11 +18,12 @@ const (
 var curtAcceleration float64
 
 type Player struct {
-	game     *GameScene
-	sprite   *ebiten.Image
-	position Vector
-	rotation float64
-	velocity float64
+	game         *GameScene
+	sprite       *ebiten.Image
+	position     Vector
+	rotation     float64
+	velocity     float64
+	collisionObj *resolv.Circle
 }
 
 func NewPlayer(game *GameScene) *Player {
@@ -36,11 +38,17 @@ func NewPlayer(game *GameScene) *Player {
 		X: ScreenWidth/2 - bCenterX,
 		Y: ScreenHeight/2 - bCenterY,
 	}
+	collisionObj := resolv.NewCircle(pos.X, pos.Y, float64(sprite.Bounds().Dx()/2))
+
 	p := &Player{
-		sprite:   sprite,
-		game:     game,
-		position: pos,
+		sprite:       sprite,
+		game:         game,
+		position:     pos,
+		collisionObj: collisionObj,
 	}
+	p.collisionObj.SetPosition(pos.X, pos.Y)
+	p.collisionObj.Tags().Set(TagPlayer)
+
 	return p
 }
 
@@ -70,6 +78,7 @@ func (p *Player) Update() {
 	}
 
 	p.accelerate()
+	p.collisionObj.SetPosition(p.position.X, p.position.Y)
 }
 
 func (p *Player) accelerate() {
@@ -98,14 +107,18 @@ func (p *Player) accelerate() {
 func (p *Player) keepOnScreen() {
 	if p.position.X >= float64(ScreenWidth) {
 		p.position.X = 0
+		p.collisionObj.SetPosition(0, p.position.Y)
 	}
 	if p.position.X < 0 {
 		p.position.X = float64(ScreenWidth)
+		p.collisionObj.SetPosition(ScreenWidth, p.position.Y)
 	}
 	if p.position.Y >= float64(ScreenHeight) {
 		p.position.Y = 0
+		p.collisionObj.SetPosition(p.position.X, 0)
 	}
 	if p.position.Y < 0 {
 		p.position.Y = float64(ScreenHeight)
+		p.collisionObj.SetPosition(p.position.X, ScreenHeight)
 	}
 }
