@@ -10,28 +10,35 @@ import (
 )
 
 const (
-	rotationPerSecond = math.Pi
-	maxAcceleration   = 8.0
-	ScreenWidth       = 1280
-	ScreenHeight      = 720 // 16:9 aspect ratio
-	shootCoolDown     = 150 * time.Millisecond
-	burstCoolDown     = 500 * time.Millisecond
-	laserSpawnOffset  = 50.0
-	maxShotsPerBurst  = 3
+	rotationPerSecond    = math.Pi
+	maxAcceleration      = 8.0
+	ScreenWidth          = 1280
+	ScreenHeight         = 720 // 16:9 aspect ratio
+	shootCoolDown        = 150 * time.Millisecond
+	burstCoolDown        = 500 * time.Millisecond
+	laserSpawnOffset     = 50.0
+	maxShotsPerBurst     = 3
+	dyingAnimationOffset = 50 * time.Millisecond
 )
 
 var curtAcceleration float64
 var shotsFired = 0
 
 type Player struct {
-	game          *GameScene
-	sprite        *ebiten.Image
-	position      Vector
-	rotation      float64
-	velocity      float64
-	collisionObj  *resolv.Circle
-	shootCoolDown *Timer
-	burstCoolDown *Timer
+	game           *GameScene
+	sprite         *ebiten.Image
+	position       Vector
+	rotation       float64
+	velocity       float64
+	collisionObj   *resolv.Circle
+	shootCoolDown  *Timer
+	burstCoolDown  *Timer
+	isShielded     bool
+	isDying        bool
+	isDead         bool
+	dyingTimer     *Timer
+	dyingCounter   int
+	livesRemaining int
 }
 
 func NewPlayer(game *GameScene) *Player {
@@ -49,12 +56,18 @@ func NewPlayer(game *GameScene) *Player {
 	collisionObj := resolv.NewCircle(pos.X, pos.Y, float64(sprite.Bounds().Dx()/2))
 
 	p := &Player{
-		sprite:        sprite,
-		game:          game,
-		position:      pos,
-		collisionObj:  collisionObj,
-		shootCoolDown: NewTimer(shootCoolDown),
-		burstCoolDown: NewTimer(burstCoolDown),
+		sprite:         sprite,
+		game:           game,
+		position:       pos,
+		collisionObj:   collisionObj,
+		shootCoolDown:  NewTimer(shootCoolDown),
+		burstCoolDown:  NewTimer(burstCoolDown),
+		isShielded:     false,
+		isDying:        false,
+		isDead:         false,
+		dyingTimer:     NewTimer(dyingAnimationOffset),
+		dyingCounter:   0,
+		livesRemaining: 1,
 	}
 	p.collisionObj.SetPosition(pos.X, pos.Y)
 	p.collisionObj.Tags().Set(TagPlayer)
@@ -79,6 +92,7 @@ func (p *Player) Draw(screen *ebiten.Image) {
 
 func (p *Player) Update() {
 	speed := rotationPerSecond / float64(ebiten.TPS())
+	p.isPlayerDead()
 
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
 		p.rotation -= speed
@@ -93,6 +107,12 @@ func (p *Player) Update() {
 	p.burstCoolDown.Update()
 	p.shootCoolDown.Update()
 	p.fireLasers()
+}
+
+func (p *Player) isPlayerDead() {
+	if p.isDead {
+		p.game._isPlayerDead = true
+	}
 }
 
 func (p *Player) fireLasers() {
@@ -112,7 +132,7 @@ func (p *Player) fireLasers() {
 				laser := NewLaser(p.game, spawnPos, p.rotation, p.game.laserCount)
 				p.game.lasers[p.game.laserCount] = laser
 				p.game.collisionSpace.Add(laser.collisionObj)
-				p.game.laserCount++
+				p.game.laserCount++ // No clearing?
 			} else {
 				p.burstCoolDown.Reset()
 				shotsFired = 0

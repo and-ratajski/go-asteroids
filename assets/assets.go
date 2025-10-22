@@ -3,6 +3,7 @@ package assets
 import (
 	"bytes"
 	"embed"
+	"fmt"
 	"image"
 	_ "image/png"
 	"io/fs"
@@ -19,6 +20,9 @@ var PlayerSprite = mustLoadImage("images/player.png")
 var AsteroidsSprites = mustLoadImages("images/meteors/*.png") // Asteroids imgs are called Meteors...
 var AsteroidsSpritesSmall = mustLoadImages("images/meteors-small/*.png")
 var LaserSprite = mustLoadImage("images/laser.png")
+var ExplosionSprite = mustLoadImage("images/explosion.png")
+var ExplosionSmallSprite = mustLoadImage("images/explosion-small.png")
+var Explosion = createExplosion()
 
 func mustLoadImages(path string) []*ebiten.Image {
 	matches, err := fs.Glob(assets, path)
@@ -67,4 +71,13 @@ func mustLoadFontFace(name string) *text.GoTextFaceSource {
 	}
 
 	return ts
+}
+
+func createExplosion() []*ebiten.Image {
+	var frames []*ebiten.Image
+	for i := 0; i < 12; i++ {
+		frame := mustLoadImage(fmt.Sprintf("images/explosion/%d.png", i+1))
+		frames = append(frames, frame)
+	}
+	return frames
 }

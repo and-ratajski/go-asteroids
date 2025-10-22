@@ -27,7 +27,8 @@ type Asteroid struct {
 }
 
 // NewAsteroid is a factory method to create new (random) asteroid - a pointer to it
-func NewAsteroid(baseVelocity float64, g *GameScene, index int) *Asteroid {
+// size is optional parameter defaulting to 'large'
+func NewAsteroid(baseVelocity float64, g *GameScene, index int, size ...string) *Asteroid {
 	// Target the center of the screen
 	target := Vector{
 		X: ScreenWidth / 2,
@@ -59,8 +60,22 @@ func NewAsteroid(baseVelocity float64, g *GameScene, index int) *Asteroid {
 		Y: normalizedDirection.Y * velocity,
 	}
 
-	// Assign a sprite to the asteroid
-	sprite := assets.AsteroidsSprites[rand.Intn(len(assets.AsteroidsSprites))]
+	// Assign a sprite to the asteroid, size is optional
+	var sprite *ebiten.Image
+	var tags resolv.Tags
+	if len(size) > 0 {
+		switch size[0] {
+		case "small": // large is the default
+			sprite = assets.AsteroidsSpritesSmall[rand.Intn(len(assets.AsteroidsSpritesSmall))]
+			tags = TagAsteroid | TagSmall
+		default:
+			sprite = assets.AsteroidsSprites[rand.Intn(len(assets.AsteroidsSprites))]
+			tags = TagAsteroid | TagLarge
+		}
+	} else {
+		sprite = assets.AsteroidsSprites[rand.Intn(len(assets.AsteroidsSprites))]
+		tags = TagAsteroid | TagLarge
+	}
 
 	// Create the collision object
 	collisionObj := resolv.NewCircle(position.X, position.Y, float64(sprite.Bounds().Dx()/2))
@@ -78,7 +93,7 @@ func NewAsteroid(baseVelocity float64, g *GameScene, index int) *Asteroid {
 
 	// Fill collision object data
 	a.collisionObj.SetPosition(position.X, position.Y)
-	a.collisionObj.Tags().Set(TagAsteroid | TagLarge)
+	a.collisionObj.Tags().Set(tags)
 	a.collisionObj.SetData(&ObjectData{index: index})
 
 	return a

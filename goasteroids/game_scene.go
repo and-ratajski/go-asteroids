@@ -1,7 +1,8 @@
 package goasteroids
 
 import (
-	"fmt"
+	"go-asteroids/assets"
+	"math/rand"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -13,43 +14,59 @@ const (
 	asteroidSpawnTime     = 100 * time.Millisecond
 	asteroidSpeedUpAmount = 0.1
 	asteroidSpeedUpTime   = 1000 * time.Millisecond
+	cleanupExplosionTime  = 200 * time.Millisecond
+	playerDyingFrames     = 12
 )
 
 type GameScene struct {
-	player             *Player
-	baseVelocity       float64
-	asteroidCount      int
-	asteroidSpawnTimer *Timer
-	asteroids          map[int]*Asteroid
-	asteroidForLevel   int
-	velocityTimer      *Timer
-	collisionSpace     *resolv.Space
-	lasers             map[int]*Laser
-	laserCount         int
+	player               *Player
+	baseVelocity         float64
+	asteroidCount        int
+	asteroidSpawnTimer   *Timer
+	asteroids            map[int]*Asteroid
+	asteroidForLevel     int
+	velocityTimer        *Timer
+	collisionSpace       *resolv.Space
+	lasers               map[int]*Laser
+	laserCount           int
+	score                int
+	explosionSmallSprite *ebiten.Image
+	explosionSprite      *ebiten.Image
+	explosionFrames      []*ebiten.Image
+	cleanUpTimer         *Timer
+	_isPlayerDead        bool
 }
 
 func NewGameScene() *GameScene {
 	g := &GameScene{
-		asteroidSpawnTimer: NewTimer(asteroidSpawnTime),
-		baseVelocity:       baseAsteroidVelocity,
-		velocityTimer:      NewTimer(asteroidSpeedUpTime),
-		asteroids:          make(map[int]*Asteroid),
-		asteroidCount:      0,
-		asteroidForLevel:   2,
-		collisionSpace:     resolv.NewSpace(ScreenWidth, ScreenHeight, 16, 16), // simple math gave 16?
-		lasers:             make(map[int]*Laser),
-		laserCount:         0,
+		asteroidSpawnTimer:   NewTimer(asteroidSpawnTime),
+		baseVelocity:         baseAsteroidVelocity,
+		velocityTimer:        NewTimer(asteroidSpeedUpTime),
+		asteroids:            make(map[int]*Asteroid),
+		asteroidCount:        0,
+		asteroidForLevel:     2,
+		collisionSpace:       resolv.NewSpace(ScreenWidth, ScreenHeight, 16, 16), // simple math gave 16?
+		lasers:               make(map[int]*Laser),
+		laserCount:           0,
+		explosionSprite:      assets.ExplosionSprite,
+		explosionSmallSprite: assets.ExplosionSmallSprite,
+		cleanUpTimer:         NewTimer(cleanupExplosionTime),
+		_isPlayerDead:        false,
 	}
 	g.player = NewPlayer(g)
 	g.collisionSpace.Add(g.player.collisionObj)
+
+	g.explosionFrames = assets.Explosion
 
 	return g
 }
 
 func (g *GameScene) Update(state *State) error {
 	g.player.Update()
-	g.spawnAsteroids()
+	g.isPlayerDying()
+	g.isPlayerDead(state)
 
+	g.spawnAsteroids()
 	for _, a := range g.asteroids {
 		a.Update()
 	}
@@ -59,6 +76,8 @@ func (g *GameScene) Update(state *State) error {
 
 	g.speedUpAsteroids()
 	g.isPlayerCollidingWithAsteroid()
+	g.isAsteroidHitByPlayerLaser()
+	g.cleanUpAsteroidsAndAliens()
 	return nil
 }
 
@@ -74,6 +93,64 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 
 func (g *GameScene) Layout(outsideWidth, outsideHeight int) (ScreenWidth, ScreenHeight int) {
 	return outsideWidth, outsideHeight
+}
+
+func (g *GameScene) isAsteroidHitByPlayerLaser() {
+	for _, a := range g.asteroids {
+		for _, l := range g.lasers {
+			if a.collisionObj.IsIntersecting(l.collisionObj) {
+				if a.collisionObj.Tags().Has(TagSmall) {
+					// Laser hit small asteroid
+					a.sprite = g.explosionSmallSprite
+					g.score++
+				} else {
+					// Laser hit Large asteroid
+					oldPos := a.position
+
+					a.sprite = g.explosionSprite
+
+					g.score++
+
+					numToSpawn := rand.Intn(noOfSmallAsteroidsFromLargerOne)
+					for i := 0; i < numToSpawn; i++ {
+						_asteroid := NewAsteroid(baseAsteroidVelocity, g, len(a.game.asteroids)-1, "small")
+						_asteroid.position = Vector{oldPos.X + float64(rand.Intn(100-50)+50), oldPos.Y + float64(rand.Intn(100-50)+50)}
+						_asteroid.collisionObj.SetPosition(_asteroid.position.X, _asteroid.position.Y)
+						g.collisionSpace.Add(_asteroid.collisionObj)
+						g.asteroidCount++
+						g.asteroids[a.game.asteroidCount] = _asteroid
+					}
+				}
+			}
+		}
+	}
+}
+
+func (g *GameScene) isPlayerDying() {
+	if g.player.isDying {
+		g.player.dyingTimer.Update()
+		if g.player.dyingTimer.IsReady() {
+			g.player.dyingTimer.Reset()
+			g.player.dyingCounter++
+			if g.player.dyingCounter == playerDyingFrames { // let the player dye for few frames...
+				g.player.isDying = false
+				g.player.isDead = true
+			} else if g.player.dyingCounter < playerDyingFrames {
+				g.player.sprite = g.explosionFrames[g.player.dyingCounter]
+			} else {
+				// do nothing - might be executed on a tick just before ^ finishes and throw indexOutOfRange error
+			}
+		}
+	}
+}
+
+func (g *GameScene) isPlayerDead(state *State) {
+	if g._isPlayerDead {
+		g.player.livesRemaining--
+		if g.player.livesRemaining == 0 {
+			state.SceneManager.GoToScene(NewGameScene())
+		}
+	}
 }
 
 func (g *GameScene) spawnAsteroids() {
@@ -100,8 +177,25 @@ func (g *GameScene) speedUpAsteroids() {
 func (g *GameScene) isPlayerCollidingWithAsteroid() {
 	for _, a := range g.asteroids {
 		if a.collisionObj.IsIntersecting(g.player.collisionObj) {
-			data := a.collisionObj.Data().(*ObjectData)
-			fmt.Println("Player collided with asteroid of index: ", data.index)
+			if !g.player.isShielded {
+				a.game.player.isDying = true
+				break
+			} else {
+				// Bounce the asteroid
+			}
 		}
+	}
+}
+
+func (g *GameScene) cleanUpAsteroidsAndAliens() {
+	g.cleanUpTimer.Update()
+	if g.cleanUpTimer.IsReady() {
+		for i, a := range g.asteroids {
+			if a.sprite == g.explosionSprite || a.sprite == g.explosionSmallSprite {
+				delete(g.asteroids, i)
+				g.collisionSpace.Remove(a.collisionObj)
+			}
+		}
+		g.cleanUpTimer.Reset()
 	}
 }
