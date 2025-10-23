@@ -11,15 +11,17 @@ import (
 )
 
 const (
-	rotationPerSecond    = math.Pi
-	maxAcceleration      = 8.0
-	ScreenWidth          = 1280
-	ScreenHeight         = 720 // 16:9 aspect ratio
-	shootCoolDown        = 150 * time.Millisecond
-	burstCoolDown        = 500 * time.Millisecond
-	laserSpawnOffset     = 50.0
-	maxShotsPerBurst     = 3
-	dyingAnimationOffset = 50 * time.Millisecond
+	ScreenWidth                 = 1280
+	ScreenHeight                = 720 // 16:9 aspect ratio
+	rotationPerSecond           = math.Pi
+	maxForwardAcceleration      = 8.0
+	forwardAccelerationIncrease = 4.0
+	maxReverseAcceleration      = 2.0
+	shootCoolDown               = 150 * time.Millisecond
+	burstCoolDown               = 500 * time.Millisecond
+	laserSpawnOffset            = 50.0
+	maxShotsPerBurst            = 3
+	dyingAnimationOffset        = 50 * time.Millisecond
 )
 
 var curtAcceleration float64
@@ -104,6 +106,10 @@ func (p *Player) Update() {
 
 	p.accelerate()
 	p.isDoneAccelerating()
+
+	p.reverse()
+	p.isDoneReversing()
+
 	p.updateExhaustSprite()
 
 	p.collisionObj.SetPosition(p.position.X, p.position.Y)
@@ -149,11 +155,11 @@ func (p *Player) accelerate() {
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
 		p.keepOnScreen()
 
-		if curtAcceleration < maxAcceleration {
-			curtAcceleration = p.velocity + 4
+		if curtAcceleration < maxForwardAcceleration {
+			curtAcceleration = p.velocity + forwardAccelerationIncrease
 		}
-		if curtAcceleration > maxAcceleration {
-			curtAcceleration = maxAcceleration
+		if curtAcceleration > maxForwardAcceleration {
+			curtAcceleration = maxForwardAcceleration
 		}
 
 		p.velocity = curtAcceleration
@@ -179,7 +185,7 @@ func (p *Player) accelerate() {
 
 		// Check if the sound is not already playing
 		if !p.game.thrustPlayer.IsPlaying() {
-			_ = p.game.thrustPlayer.Rewind()
+			_ = p.game.thrustPlayer.Rewind() // Important to rewind
 			p.game.thrustPlayer.Play()
 		}
 	}
@@ -193,8 +199,45 @@ func (p *Player) isDoneAccelerating() {
 	}
 }
 
+func (p *Player) reverse() {
+	if ebiten.IsKeyPressed(ebiten.KeyDown) {
+		p.keepOnScreen()
+
+		dx := -math.Sin(p.rotation) * maxReverseAcceleration
+		dy := math.Cos(p.rotation) * maxReverseAcceleration
+
+		bounds := p.sprite.Bounds()
+		halfW := float64(bounds.Dx() / 2)
+		halfH := float64(bounds.Dy() / 2)
+
+		exhSpawnPos := Vector{
+			p.position.X + halfW - math.Sin(p.rotation)*exhaustSpawnOffest,
+			p.position.Y + halfH + math.Cos(p.rotation)*exhaustSpawnOffest,
+		}
+		p.game.exhaust = NewExhaust(exhSpawnPos, p.rotation+180.0*math.Pi/180.0)
+
+		p.position.X += dx
+		p.position.Y += dy
+
+		p.collisionObj.SetPosition(p.position.X, p.position.Y)
+
+		if !p.game.thrustPlayer.IsPlaying() {
+			_ = p.game.thrustPlayer.Rewind()
+			p.game.thrustPlayer.Play()
+		}
+	}
+}
+
+func (p *Player) isDoneReversing() {
+	if inpututil.IsKeyJustReleased(ebiten.KeyDown) {
+		if p.game.thrustPlayer.IsPlaying() {
+			p.game.thrustPlayer.Pause()
+		}
+	}
+}
+
 func (p *Player) updateExhaustSprite() {
-	if !ebiten.IsKeyPressed(ebiten.KeyUp) && p.game.exhaust != nil {
+	if !ebiten.IsKeyPressed(ebiten.KeyUp) && !ebiten.IsKeyPressed(ebiten.KeyDown) && p.game.exhaust != nil {
 		p.game.exhaust = nil
 	}
 }

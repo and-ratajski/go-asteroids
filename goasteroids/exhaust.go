@@ -47,7 +47,7 @@ func (e *Exhaust) Draw(screen *ebiten.Image) {
 }
 
 func (e *Exhaust) Update() {
-	speed := maxAcceleration / float64(ebiten.TPS())
+	speed := maxForwardAcceleration / float64(ebiten.TPS())
 	e.position.X += math.Sin(e.rotation) * speed
 	e.position.Y += -math.Cos(e.rotation) * speed
 }
