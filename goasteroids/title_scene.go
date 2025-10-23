@@ -10,11 +10,22 @@ import (
 )
 
 type TitleScene struct {
+	stars         []*Star
 	asteroids     map[int]*Asteroid
 	asteroidCount int
 }
 
 func (t *TitleScene) Draw(screen *ebiten.Image) {
+	// Draw stars
+	for _, s := range t.stars {
+		s.Draw(screen)
+	}
+	// Draw asteroids
+	for _, a := range t.asteroids {
+		a.Draw(screen)
+	}
+
+	// Draw text
 	textToDraw := "1 coin 1 play"
 	op := &text.DrawOptions{
 		LayoutOptions: text.LayoutOptions{
@@ -27,10 +38,6 @@ func (t *TitleScene) Draw(screen *ebiten.Image) {
 		Source: assets.TitleFont,
 		Size:   48,
 	}, op)
-
-	for _, a := range t.asteroids {
-		a.Draw(screen)
-	}
 }
 
 func (t *TitleScene) Update(state *State) error {

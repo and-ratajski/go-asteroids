@@ -18,11 +18,13 @@ const (
 	cleanupExplosionTime  = 200 * time.Millisecond
 	playerDyingFrames     = 12
 	baseBeatWaitTime      = 1600
+	numberOfStars         = 1000
 )
 
 type GameScene struct {
 	player               *Player
 	baseVelocity         float64
+	stars                []*Star
 	asteroidCount        int
 	asteroidSpawnTimer   *Timer
 	asteroids            map[int]*Asteroid
@@ -56,6 +58,7 @@ func NewGameScene() *GameScene {
 		asteroidSpawnTimer:   NewTimer(asteroidSpawnTime),
 		baseVelocity:         baseAsteroidVelocity,
 		velocityTimer:        NewTimer(asteroidSpeedUpTime),
+		stars:                GenerateStars(numberOfStars),
 		asteroids:            make(map[int]*Asteroid),
 		asteroidCount:        0,
 		asteroidForLevel:     2,
@@ -122,17 +125,20 @@ func (g *GameScene) Update(state *State) error {
 }
 
 func (g *GameScene) Draw(screen *ebiten.Image) {
-	g.player.Draw(screen)
-
-	if g.exhaust != nil {
-		g.exhaust.Draw(screen)
+	for _, s := range g.stars {
+		s.Draw(screen)
 	}
-
 	for _, a := range g.asteroids {
 		a.Draw(screen)
 	}
 	for _, l := range g.lasers {
 		l.Draw(screen)
+	}
+
+	g.player.Draw(screen)
+
+	if g.exhaust != nil {
+		g.exhaust.Draw(screen)
 	}
 }
 
@@ -300,4 +306,5 @@ func (g *GameScene) Reset() {
 
 	// Add fresh player obj
 	g.collisionSpace.Add(g.player.collisionObj)
+	g.stars = GenerateStars(numberOfStars)
 }
