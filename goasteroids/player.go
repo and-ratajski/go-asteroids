@@ -143,6 +143,24 @@ func (p *Player) fireLasers() {
 				p.game.lasers[p.game.laserCount] = laser
 				p.game.collisionSpace.Add(laser.collisionObj)
 				p.game.laserCount++ // No clearing?
+
+				switch shotsFired {
+				case 1:
+					if !p.game.laserPlayerOne.IsPlaying() {
+						_ = p.game.laserPlayerOne.Rewind()
+						p.game.laserPlayerOne.Play()
+					}
+				case 2:
+					if !p.game.laserPlayerTwo.IsPlaying() {
+						_ = p.game.laserPlayerTwo.Rewind()
+						p.game.laserPlayerTwo.Play()
+					}
+				case 3:
+					if !p.game.laserPlayerThree.IsPlaying() {
+						_ = p.game.laserPlayerThree.Rewind()
+						p.game.laserPlayerThree.Play()
+					}
+				}
 			} else {
 				p.burstCoolDown.Reset()
 				shotsFired = 0

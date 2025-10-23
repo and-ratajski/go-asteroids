@@ -17,6 +17,7 @@ const (
 	asteroidSpeedUpTime   = 1000 * time.Millisecond
 	cleanupExplosionTime  = 200 * time.Millisecond
 	playerDyingFrames     = 12
+	baseBeatWaitTime      = 1600
 )
 
 type GameScene struct {
@@ -39,6 +40,15 @@ type GameScene struct {
 	audioContext         *audio.Context
 	thrustPlayer         *audio.Player
 	exhaust              *Exhaust // added dynamically when keyUp pressed
+	laserPlayerOne       *audio.Player
+	laserPlayerTwo       *audio.Player
+	laserPlayerThree     *audio.Player
+	explosionPlayer      *audio.Player
+	beatPlayerOne        *audio.Player
+	beatPlayerTwo        *audio.Player
+	beatTimer            *Timer
+	beatWaitTime         int
+	playBeatOne          bool
 }
 
 func NewGameScene() *GameScene {
@@ -56,6 +66,8 @@ func NewGameScene() *GameScene {
 		explosionSmallSprite: assets.ExplosionSmallSprite,
 		cleanUpTimer:         NewTimer(cleanupExplosionTime),
 		_isPlayerDead:        false,
+		beatTimer:            NewTimer(2 * time.Second),
+		beatWaitTime:         baseBeatWaitTime,
 	}
 	g.player = NewPlayer(g)
 	g.collisionSpace.Add(g.player.collisionObj)
@@ -66,6 +78,23 @@ func NewGameScene() *GameScene {
 	g.audioContext = audio.NewContext(48000) // see docs
 	thrustPlayer, _ := g.audioContext.NewPlayer(assets.ThrustSound)
 	g.thrustPlayer = thrustPlayer
+
+	laserPlayerOne, _ := g.audioContext.NewPlayer(assets.LaserSoundOne)
+	g.laserPlayerOne = laserPlayerOne
+
+	laserPlayerTwo, _ := g.audioContext.NewPlayer(assets.LaserSoundTwo)
+	g.laserPlayerTwo = laserPlayerTwo
+
+	laserPlayerThree, _ := g.audioContext.NewPlayer(assets.LaserSoundThree)
+	g.laserPlayerThree = laserPlayerThree
+
+	explosionPlayer, _ := g.audioContext.NewPlayer(assets.ExplosionSound)
+	g.explosionPlayer = explosionPlayer
+
+	beatPlayerOne, _ := g.audioContext.NewPlayer(assets.BeatSoundOne)
+	g.beatPlayerOne = beatPlayerOne
+	beatPlayerTwo, _ := g.audioContext.NewPlayer(assets.BeatSoundTwo)
+	g.beatPlayerTwo = beatPlayerTwo
 
 	return g
 }
@@ -87,6 +116,8 @@ func (g *GameScene) Update(state *State) error {
 	g.isPlayerCollidingWithAsteroid()
 	g.isAsteroidHitByPlayerLaser()
 	g.cleanUpAsteroidsAndAliens()
+	g.beatSound()
+
 	return nil
 }
 
@@ -109,6 +140,28 @@ func (g *GameScene) Layout(outsideWidth, outsideHeight int) (ScreenWidth, Screen
 	return outsideWidth, outsideHeight
 }
 
+func (g *GameScene) beatSound() {
+	g.beatTimer.Update()
+	if g.beatTimer.IsReady() {
+		if g.playBeatOne {
+			_ = g.beatPlayerOne.Rewind()
+			g.beatPlayerOne.Play()
+			g.beatTimer.Reset()
+		} else {
+			_ = g.beatPlayerTwo.Rewind()
+			g.beatPlayerTwo.Play()
+			g.beatTimer.Reset()
+		}
+		g.playBeatOne = !g.playBeatOne
+
+		// Speed up the Timer for playing beats
+		if g.beatWaitTime > 400 {
+			g.beatWaitTime = g.beatWaitTime - 25
+			g.beatTimer = NewTimer(time.Duration(g.beatWaitTime) * time.Millisecond)
+		}
+	}
+}
+
 func (g *GameScene) updateExhaust() {
 	if g.exhaust != nil {
 		g.exhaust.Update()
@@ -123,6 +176,7 @@ func (g *GameScene) isAsteroidHitByPlayerLaser() {
 					// Laser hit small asteroid
 					a.sprite = g.explosionSmallSprite
 					g.score++
+					g.playExplosionSound()
 				} else {
 					// Laser hit Large asteroid
 					oldPos := a.position
@@ -130,7 +184,7 @@ func (g *GameScene) isAsteroidHitByPlayerLaser() {
 					a.sprite = g.explosionSprite
 
 					g.score++
-
+					g.playExplosionSound()
 					numToSpawn := rand.Intn(noOfSmallAsteroidsFromLargerOne)
 					for i := 0; i < numToSpawn; i++ {
 						_asteroid := NewAsteroid(baseAsteroidVelocity, g, len(a.game.asteroids)-1, "small")
@@ -200,6 +254,7 @@ func (g *GameScene) isPlayerCollidingWithAsteroid() {
 		if a.collisionObj.IsIntersecting(g.player.collisionObj) {
 			if !g.player.isShielded {
 				a.game.player.isDying = true
+				g.playExplosionSound()
 				break
 			} else {
 				// Bounce the asteroid
@@ -221,8 +276,15 @@ func (g *GameScene) cleanUpAsteroidsAndAliens() {
 	}
 }
 
+func (g *GameScene) playExplosionSound() {
+	if !g.explosionPlayer.IsPlaying() {
+		_ = g.explosionPlayer.Rewind()
+		g.explosionPlayer.Play()
+	}
+}
+
 func (g *GameScene) Reset() {
-	// Clear all
+	// Clear all but audio
 	g.player = NewPlayer(g)
 	g.asteroids = make(map[int]*Asteroid)
 	g.asteroidCount = 0
