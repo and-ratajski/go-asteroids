@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/solarlune/resolv"
 )
 
@@ -35,6 +36,9 @@ type GameScene struct {
 	explosionFrames      []*ebiten.Image
 	cleanUpTimer         *Timer
 	_isPlayerDead        bool
+	audioContext         *audio.Context
+	thrustPlayer         *audio.Player
+	exhaust              *Exhaust // added dynamically when keyUp pressed
 }
 
 func NewGameScene() *GameScene {
@@ -57,6 +61,11 @@ func NewGameScene() *GameScene {
 	g.collisionSpace.Add(g.player.collisionObj)
 
 	g.explosionFrames = assets.Explosion
+
+	// Load audio
+	g.audioContext = audio.NewContext(48000) // see docs
+	thrustPlayer, _ := g.audioContext.NewPlayer(assets.ThrustSound)
+	g.thrustPlayer = thrustPlayer
 
 	return g
 }
@@ -83,6 +92,11 @@ func (g *GameScene) Update(state *State) error {
 
 func (g *GameScene) Draw(screen *ebiten.Image) {
 	g.player.Draw(screen)
+
+	if g.exhaust != nil {
+		g.exhaust.Draw(screen)
+	}
+
 	for _, a := range g.asteroids {
 		a.Draw(screen)
 	}
@@ -93,6 +107,12 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 
 func (g *GameScene) Layout(outsideWidth, outsideHeight int) (ScreenWidth, ScreenHeight int) {
 	return outsideWidth, outsideHeight
+}
+
+func (g *GameScene) updateExhaust() {
+	if g.exhaust != nil {
+		g.exhaust.Update()
+	}
 }
 
 func (g *GameScene) isAsteroidHitByPlayerLaser() {
@@ -148,7 +168,8 @@ func (g *GameScene) isPlayerDead(state *State) {
 	if g._isPlayerDead {
 		g.player.livesRemaining--
 		if g.player.livesRemaining == 0 {
-			state.SceneManager.GoToScene(NewGameScene())
+			g.Reset() // Reset current scene rather than creating a new one because of audio bug
+			state.SceneManager.GoToScene(g)
 		}
 	}
 }
@@ -198,4 +219,23 @@ func (g *GameScene) cleanUpAsteroidsAndAliens() {
 		}
 		g.cleanUpTimer.Reset()
 	}
+}
+
+func (g *GameScene) Reset() {
+	// Clear all
+	g.player = NewPlayer(g)
+	g.asteroids = make(map[int]*Asteroid)
+	g.asteroidCount = 0
+	g.lasers = make(map[int]*Laser)
+	g.laserCount = 0
+	g.score = 0
+	g.asteroidSpawnTimer.Reset()
+	g.baseVelocity = baseAsteroidVelocity
+	g.velocityTimer.Reset()
+	g._isPlayerDead = false
+	g.exhaust = nil
+	g.collisionSpace.RemoveAll()
+
+	// Add fresh player obj
+	g.collisionSpace.Add(g.player.collisionObj)
 }

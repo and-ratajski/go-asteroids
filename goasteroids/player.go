@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/solarlune/resolv"
 )
 
@@ -102,6 +103,9 @@ func (p *Player) Update() {
 	}
 
 	p.accelerate()
+	p.isDoneAccelerating()
+	p.updateExhaustSprite()
+
 	p.collisionObj.SetPosition(p.position.X, p.position.Y)
 
 	p.burstCoolDown.Update()
@@ -158,9 +162,40 @@ func (p *Player) accelerate() {
 		dx := math.Sin(p.rotation) * curtAcceleration
 		dy := -math.Cos(p.rotation) * curtAcceleration
 
+		// Show exhaust
+		bounds := p.sprite.Bounds()
+		halfW := float64(bounds.Dx() / 2)
+		halfH := float64(bounds.Dy() / 2)
+
+		exhSpawnPos := Vector{
+			p.position.X + halfW + math.Sin(p.rotation)*exhaustSpawnOffest,
+			p.position.Y + halfH - math.Cos(p.rotation)*exhaustSpawnOffest,
+		}
+		p.game.exhaust = NewExhaust(exhSpawnPos, p.rotation+180.0*math.Pi/180.0)
+
 		// Move the player on the screen
 		p.position.X += dx
 		p.position.Y += dy
+
+		// Check if the sound is not already playing
+		if !p.game.thrustPlayer.IsPlaying() {
+			_ = p.game.thrustPlayer.Rewind()
+			p.game.thrustPlayer.Play()
+		}
+	}
+}
+
+func (p *Player) isDoneAccelerating() {
+	if inpututil.IsKeyJustReleased(ebiten.KeyUp) {
+		if p.game.thrustPlayer.IsPlaying() {
+			p.game.thrustPlayer.Pause()
+		}
+	}
+}
+
+func (p *Player) updateExhaustSprite() {
+	if !ebiten.IsKeyPressed(ebiten.KeyUp) && p.game.exhaust != nil {
+		p.game.exhaust = nil
 	}
 }
 
