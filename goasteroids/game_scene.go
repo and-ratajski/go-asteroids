@@ -1,12 +1,16 @@
 package goasteroids
 
 import (
+	"fmt"
 	"go-asteroids/assets"
+	"image/color"
+	"log"
 	"math/rand"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/solarlune/resolv"
 )
 
@@ -34,6 +38,7 @@ type GameScene struct {
 	lasers               map[int]*Laser
 	laserCount           int
 	score                int
+	currentLevel         int
 	explosionSmallSprite *ebiten.Image
 	explosionSprite      *ebiten.Image
 	explosionFrames      []*ebiten.Image
@@ -71,6 +76,7 @@ func NewGameScene() *GameScene {
 		_isPlayerDead:        false,
 		beatTimer:            NewTimer(2 * time.Second),
 		beatWaitTime:         baseBeatWaitTime,
+		currentLevel:         1,
 	}
 	g.player = NewPlayer(g)
 	g.collisionSpace.Add(g.player.collisionObj)
@@ -121,6 +127,8 @@ func (g *GameScene) Update(state *State) error {
 	g.cleanUpAsteroidsAndAliens()
 	g.beatSound()
 
+	g.isLevelCompleted(state)
+
 	return nil
 }
 
@@ -128,22 +136,95 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 	for _, s := range g.stars {
 		s.Draw(screen)
 	}
+	g.player.Draw(screen)
+
 	for _, a := range g.asteroids {
 		a.Draw(screen)
 	}
 	for _, l := range g.lasers {
 		l.Draw(screen)
 	}
-
-	g.player.Draw(screen)
-
 	if g.exhaust != nil {
 		g.exhaust.Draw(screen)
 	}
+	if len(g.player.lifeIndicators) > 0 {
+		for _, li := range g.player.lifeIndicators {
+			li.Draw(screen)
+		}
+	}
+
+	// Draw the score and the high score
+	text2Draw := fmt.Sprintf("%06d", g.score)
+	op := &text.DrawOptions{
+		LayoutOptions: text.LayoutOptions{
+			PrimaryAlign: text.AlignCenter,
+		},
+	}
+	op.ColorScale.ScaleWithColor(color.White)
+	op.GeoM.Translate(ScreenWidth/2, 40)
+	text.Draw(screen, text2Draw, &text.GoTextFace{
+		Source: assets.ScoreFont,
+		Size:   24,
+	}, op)
+
+	if g.score >= highScore {
+		highScore = g.score
+	}
+	text2Draw = fmt.Sprintf("HIGH SCORE %06d", highScore)
+	op = &text.DrawOptions{
+		LayoutOptions: text.LayoutOptions{
+			PrimaryAlign: text.AlignCenter,
+		},
+	}
+	op.ColorScale.ScaleWithColor(color.White)
+	op.GeoM.Translate(ScreenWidth/2, 75)
+	text.Draw(screen, text2Draw, &text.GoTextFace{
+		Source: assets.ScoreFont,
+		Size:   16,
+	}, op)
+
+	// Draw current level
+	text2Draw = fmt.Sprintf("LEVEL %d", g.currentLevel)
+	op = &text.DrawOptions{
+		LayoutOptions: text.LayoutOptions{
+			PrimaryAlign: text.AlignCenter,
+		},
+	}
+	op.ColorScale.ScaleWithColor(color.White)
+	op.GeoM.Translate(ScreenWidth/2, ScreenHeight-40)
+	text.Draw(screen, text2Draw, &text.GoTextFace{
+		Source: assets.LevelFont,
+		Size:   16,
+	}, op)
 }
 
 func (g *GameScene) Layout(outsideWidth, outsideHeight int) (ScreenWidth, ScreenHeight int) {
 	return outsideWidth, outsideHeight
+}
+
+func (g *GameScene) isLevelCompleted(state *State) {
+	if g.asteroidCount >= g.asteroidForLevel && len(g.asteroids) == 0 {
+		g.baseVelocity = baseAsteroidVelocity
+		g.currentLevel++
+
+		// Give extra live after surviving each 5 levels
+		if g.currentLevel%5 == 0 {
+			if g.player.livesRemaining < 6 {
+				g.player.livesRemaining++
+				liX := float64(20 + len(g.player.lifeIndicators)*50.0)
+				liY := 20.0
+				g.player.lifeIndicators = append(g.player.lifeIndicators, NewLifeIndicator(Vector{liX, liY}))
+			}
+		}
+
+		g.beatWaitTime = baseBeatWaitTime
+
+		state.SceneManager.GoToScene(&LevelStartsScene{
+			gameScene:      g,
+			stars:          GenerateStars(numberOfStars),
+			nextLevelTimer: NewTimer(2 * time.Second),
+		})
+	}
 }
 
 func (g *GameScene) beatSound() {
@@ -228,8 +309,33 @@ func (g *GameScene) isPlayerDead(state *State) {
 	if g._isPlayerDead {
 		g.player.livesRemaining--
 		if g.player.livesRemaining == 0 {
-			g.Reset() // Reset current scene rather than creating a new one because of audio bug
-			state.SceneManager.GoToScene(g)
+			// DEAD
+
+			if g.score > originalHighScore {
+				err := updateHighScore(g.score)
+				if err != nil {
+					log.Println(err)
+				}
+			}
+			state.SceneManager.GoToScene(&GameOverScene{
+				gameScene:     g,
+				asteroids:     make(map[int]*Asteroid),
+				asteroidCount: 5,
+				stars:         GenerateStars(numberOfStars),
+			})
+		} else {
+			// NOT DEAD
+			score := g.score
+			livesRemaining := g.player.livesRemaining
+			lifeSlice := g.player.lifeIndicators[:len(g.player.lifeIndicators)-1]
+			stars := g.stars
+
+			g.Reset()
+
+			g.player.livesRemaining = livesRemaining
+			g.score = score
+			g.player.lifeIndicators = lifeSlice
+			g.stars = stars
 		}
 	}
 }

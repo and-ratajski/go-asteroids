@@ -17,6 +17,8 @@ import (
 var assets embed.FS
 
 var TitleFont = mustLoadFontFace("fonts/title.ttf")
+var ScoreFont = mustLoadFontFace("fonts/score.ttf")
+var LevelFont = mustLoadFontFace("fonts/score.ttf")
 var PlayerSprite = mustLoadImage("images/player.png")
 var AsteroidsSprites = mustLoadImages("images/meteors/*.png") // Asteroids imgs are called Meteors...
 var AsteroidsSpritesSmall = mustLoadImages("images/meteors-small/*.png")
@@ -32,6 +34,7 @@ var LaserSoundThree = mustLoadOggVorbis("audio/fire.ogg")
 var ExplosionSound = mustLoadOggVorbis("audio/explosion.ogg")
 var BeatSoundOne = mustLoadOggVorbis("audio/beat1.ogg")
 var BeatSoundTwo = mustLoadOggVorbis("audio/beat2.ogg")
+var LifeIndicator = mustLoadImage("images/life-indicator.png")
 
 func mustLoadOggVorbis(path string) *vorbis.Stream {
 	f, err := assets.ReadFile(path)

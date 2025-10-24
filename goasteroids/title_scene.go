@@ -3,11 +3,25 @@ package goasteroids
 import (
 	"go-asteroids/assets"
 	"image/color"
+	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
+
+var highScore int
+var originalHighScore int
+
+// init will be called only once (this is how GO works) and read high score from store
+func init() {
+	hs, err := getHighScore()
+	if err != nil {
+		log.Println("Error getting high score: ", err)
+	}
+	highScore = hs
+	originalHighScore = hs
+}
 
 type TitleScene struct {
 	stars         []*Star
