@@ -35,6 +35,10 @@ var ExplosionSound = mustLoadOggVorbis("audio/explosion.ogg")
 var BeatSoundOne = mustLoadOggVorbis("audio/beat1.ogg")
 var BeatSoundTwo = mustLoadOggVorbis("audio/beat2.ogg")
 var LifeIndicator = mustLoadImage("images/life-indicator.png")
+var ShieldSound = mustLoadOggVorbis("audio/shield.ogg")
+var ShieldSprite = mustLoadImage("images/shield.png")
+var ShieldIndicator = mustLoadImage("images/shield-indicator.png")
+var HyperSpaceIndicator = mustLoadImage("images/hyperspace.png")
 
 func mustLoadOggVorbis(path string) *vorbis.Stream {
 	f, err := assets.ReadFile(path)

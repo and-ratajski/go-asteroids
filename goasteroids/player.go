@@ -3,6 +3,7 @@ package goasteroids
 import (
 	"go-asteroids/assets"
 	"math"
+	"math/rand"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -23,27 +24,35 @@ const (
 	maxShotsPerBurst            = 3
 	dyingAnimationOffset        = 50 * time.Millisecond
 	numberOfLives               = 3
+	numberOfShields             = 3
+	shieldDuration              = 6 * time.Second
+	hyperSpaceCooldown          = 10 * time.Second
 )
 
 var curtAcceleration float64
 var shotsFired = 0
 
 type Player struct {
-	game           *GameScene
-	sprite         *ebiten.Image
-	position       Vector
-	rotation       float64
-	velocity       float64
-	collisionObj   *resolv.Circle
-	shootCoolDown  *Timer
-	burstCoolDown  *Timer
-	isShielded     bool
-	isDying        bool
-	isDead         bool
-	dyingTimer     *Timer
-	dyingCounter   int
-	livesRemaining int
-	lifeIndicators []*LifeIndicator
+	game                *GameScene
+	sprite              *ebiten.Image
+	position            Vector
+	rotation            float64
+	velocity            float64
+	collisionObj        *resolv.Circle
+	shootCoolDown       *Timer
+	burstCoolDown       *Timer
+	isShielded          bool
+	isDying             bool
+	isDead              bool
+	dyingTimer          *Timer
+	dyingCounter        int
+	livesRemaining      int
+	lifeIndicators      []*LifeIndicator
+	shieldTimer         *Timer
+	shieldsRemaining    int
+	shieldIndicators    []*ShieldIndicator
+	hyperSpaceIndicator *HyperSpaceIndicator
+	hyperSpaceTimer     *Timer
 }
 
 func NewPlayer(game *GameScene) *Player {
@@ -62,27 +71,40 @@ func NewPlayer(game *GameScene) *Player {
 
 	// Add live indicators - number of icons displayed one next to another
 	var lifeIndicators []*LifeIndicator
-	var liStartPositionX = 30.0
+	var liStartPositionX = 20.0
 	for i := 0; i < numberOfLives; i++ {
 		li := NewLifeIndicator(Vector{X: liStartPositionX, Y: 20.0})
 		lifeIndicators = append(lifeIndicators, li)
 		liStartPositionX += 50.0
 	}
 
+	// Add shield indicators - number of icons displayed one next to another
+	var shieldIndicators []*ShieldIndicator
+	var siStartPositionX = 45.0
+	for i := 0; i < numberOfShields; i++ {
+		si := NewShieldIndicator(Vector{X: siStartPositionX, Y: 60.0})
+		shieldIndicators = append(shieldIndicators, si)
+		siStartPositionX += 50.0
+	}
+
 	p := &Player{
-		sprite:         sprite,
-		game:           game,
-		position:       pos,
-		collisionObj:   collisionObj,
-		shootCoolDown:  NewTimer(shootCoolDown),
-		burstCoolDown:  NewTimer(burstCoolDown),
-		isShielded:     false,
-		isDying:        false,
-		isDead:         false,
-		dyingTimer:     NewTimer(dyingAnimationOffset),
-		dyingCounter:   0,
-		livesRemaining: numberOfLives,
-		lifeIndicators: lifeIndicators,
+		sprite:              sprite,
+		game:                game,
+		position:            pos,
+		collisionObj:        collisionObj,
+		shootCoolDown:       NewTimer(shootCoolDown),
+		burstCoolDown:       NewTimer(burstCoolDown),
+		isShielded:          false,
+		isDying:             false,
+		isDead:              false,
+		dyingTimer:          NewTimer(dyingAnimationOffset),
+		dyingCounter:        0,
+		livesRemaining:      numberOfLives,
+		lifeIndicators:      lifeIndicators,
+		shieldsRemaining:    numberOfShields,
+		shieldIndicators:    shieldIndicators,
+		hyperSpaceIndicator: NewHyperSpaceIndicator(Vector{X: 37.0, Y: 95.0}), // found by trail an error
+		hyperSpaceTimer:     nil,
 	}
 	p.collisionObj.SetPosition(pos.X, pos.Y)
 	p.collisionObj.Tags().Set(TagPlayer)
@@ -123,17 +145,46 @@ func (p *Player) Update() {
 	p.isDoneReversing()
 
 	p.updateExhaustSprite()
+	p.useShield()
 
 	p.collisionObj.SetPosition(p.position.X, p.position.Y)
 
 	p.burstCoolDown.Update()
 	p.shootCoolDown.Update()
 	p.fireLasers()
+
+	p.hyperSpace()
+	if p.hyperSpaceTimer != nil {
+		p.hyperSpaceTimer.Update()
+	}
 }
 
 func (p *Player) isPlayerDead() {
 	if p.isDead {
 		p.game._isPlayerDead = true
+	}
+}
+
+func (p *Player) hyperSpace() {
+	if ebiten.IsKeyPressed(ebiten.KeyH) && (p.hyperSpaceTimer == nil || p.hyperSpaceTimer.IsReady()) {
+		var randX, randY int
+		for {
+			randX = rand.Intn(ScreenWidth)
+			randX = rand.Intn(ScreenHeight)
+
+			collision := p.game.checkCollision(p.collisionObj, nil)
+			if !collision {
+				break
+			}
+		}
+
+		p.position.X = float64(randX)
+		p.position.Y = float64(randY)
+
+		if p.hyperSpaceTimer == nil {
+			p.hyperSpaceTimer = NewTimer(hyperSpaceCooldown)
+		}
+		p.hyperSpaceTimer.Reset()
 	}
 }
 
@@ -269,6 +320,32 @@ func (p *Player) isDoneReversing() {
 func (p *Player) updateExhaustSprite() {
 	if !ebiten.IsKeyPressed(ebiten.KeyUp) && !ebiten.IsKeyPressed(ebiten.KeyDown) && p.game.exhaust != nil {
 		p.game.exhaust = nil
+	}
+}
+
+func (p *Player) useShield() {
+	if ebiten.IsKeyPressed(ebiten.KeyS) && !p.isShielded && p.shieldsRemaining > 0 {
+		if !p.game.shieldsUpPlayer.IsPlaying() {
+			_ = p.game.shieldsUpPlayer.Rewind()
+			p.game.shieldsUpPlayer.Play()
+		}
+
+		p.isShielded = true
+		p.shieldTimer = NewTimer(shieldDuration)
+		p.game.shield = NewShield(Vector{}, p.rotation, p.game)
+		p.shieldsRemaining--
+		p.shieldIndicators = p.shieldIndicators[:len(p.shieldIndicators)-1]
+	}
+
+	if p.shieldTimer != nil && p.isShielded {
+		p.shieldTimer.Update()
+	}
+
+	if p.shieldTimer != nil && p.shieldTimer.IsReady() {
+		p.shieldTimer = nil
+		p.isShielded = false
+		p.game.collisionSpace.Remove(p.game.shield.collisionObj)
+		p.game.shield = nil
 	}
 }
 

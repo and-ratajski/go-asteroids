@@ -56,6 +56,8 @@ type GameScene struct {
 	beatTimer            *Timer
 	beatWaitTime         int
 	playBeatOne          bool
+	shield               *Shield
+	shieldsUpPlayer      *audio.Player
 }
 
 func NewGameScene() *GameScene {
@@ -105,11 +107,18 @@ func NewGameScene() *GameScene {
 	beatPlayerTwo, _ := g.audioContext.NewPlayer(assets.BeatSoundTwo)
 	g.beatPlayerTwo = beatPlayerTwo
 
+	shieldsUpPlayer, _ := g.audioContext.NewPlayer(assets.ShieldSound)
+	g.shieldsUpPlayer = shieldsUpPlayer
+
 	return g
 }
 
 func (g *GameScene) Update(state *State) error {
 	g.player.Update()
+
+	g.updateExhaust() // works exactly the same without it..
+	g.updateShield()
+
 	g.isPlayerDying()
 	g.isPlayerDead(state)
 
@@ -147,10 +156,23 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 	if g.exhaust != nil {
 		g.exhaust.Draw(screen)
 	}
+
+	if g.shield != nil {
+		g.shield.Draw(screen)
+	}
+
 	if len(g.player.lifeIndicators) > 0 {
 		for _, li := range g.player.lifeIndicators {
 			li.Draw(screen)
 		}
+	}
+	if len(g.player.shieldIndicators) > 0 {
+		for _, si := range g.player.shieldIndicators {
+			si.Draw(screen)
+		}
+	}
+	if g.player.hyperSpaceTimer == nil || g.player.hyperSpaceTimer.IsReady() {
+		g.player.hyperSpaceIndicator.Draw(screen)
 	}
 
 	// Draw the score and the high score
@@ -255,6 +277,12 @@ func (g *GameScene) updateExhaust() {
 	}
 }
 
+func (g *GameScene) updateShield() {
+	if g.shield != nil {
+		g.shield.Update()
+	}
+}
+
 func (g *GameScene) isAsteroidHitByPlayerLaser() {
 	for _, a := range g.asteroids {
 		for _, l := range g.lasers {
@@ -267,7 +295,6 @@ func (g *GameScene) isAsteroidHitByPlayerLaser() {
 				} else {
 					// Laser hit Large asteroid
 					oldPos := a.position
-
 					a.sprite = g.explosionSprite
 
 					g.score++
@@ -310,7 +337,6 @@ func (g *GameScene) isPlayerDead(state *State) {
 		g.player.livesRemaining--
 		if g.player.livesRemaining == 0 {
 			// DEAD
-
 			if g.score > originalHighScore {
 				err := updateHighScore(g.score)
 				if err != nil {
@@ -329,6 +355,8 @@ func (g *GameScene) isPlayerDead(state *State) {
 			livesRemaining := g.player.livesRemaining
 			lifeSlice := g.player.lifeIndicators[:len(g.player.lifeIndicators)-1]
 			stars := g.stars
+			shieldsRemaining := g.player.shieldsRemaining
+			shieldSlice := g.player.shieldIndicators
 
 			g.Reset()
 
@@ -336,6 +364,8 @@ func (g *GameScene) isPlayerDead(state *State) {
 			g.score = score
 			g.player.lifeIndicators = lifeSlice
 			g.stars = stars
+			g.player.shieldsRemaining = shieldsRemaining
+			g.player.shieldIndicators = shieldSlice
 		}
 	}
 }
@@ -369,10 +399,25 @@ func (g *GameScene) isPlayerCollidingWithAsteroid() {
 				g.playExplosionSound()
 				break
 			} else {
-				// Bounce the asteroid
+				g.bounceAsteroid(a)
 			}
 		}
 	}
+}
+
+func (g *GameScene) bounceAsteroid(a *Asteroid) {
+	direction := Vector{
+		X: -1 * (ScreenWidth/2 - a.position.X),
+		Y: -1 * (ScreenHeight/2 - a.position.Y),
+	}
+	normalizedDirection := direction.Normalize()
+	velocity := g.baseVelocity // todo multiply velocity after bounce
+
+	movement := Vector{
+		X: normalizedDirection.X * velocity,
+		Y: normalizedDirection.Y * velocity,
+	}
+	a.movement = movement
 }
 
 func (g *GameScene) cleanUpAsteroidsAndAliens() {
@@ -409,8 +454,10 @@ func (g *GameScene) Reset() {
 	g._isPlayerDead = false
 	g.exhaust = nil
 	g.collisionSpace.RemoveAll()
+	g.player.isShielded = false // to be super safe, when user dies just after opening a shield
 
 	// Add fresh player obj
 	g.collisionSpace.Add(g.player.collisionObj)
 	g.stars = GenerateStars(numberOfStars)
+	g.player.shieldsRemaining = numberOfShields
 }
