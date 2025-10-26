@@ -27,6 +27,7 @@ const (
 	numberOfShields             = 3
 	shieldDuration              = 6 * time.Second
 	hyperSpaceCooldown          = 10 * time.Second
+	driftTime                   = 30 * time.Second
 )
 
 var curtAcceleration float64
@@ -53,6 +54,8 @@ type Player struct {
 	shieldIndicators    []*ShieldIndicator
 	hyperSpaceIndicator *HyperSpaceIndicator
 	hyperSpaceTimer     *Timer
+	driftTimer          *Timer
+	driftAngle          float64 // While player is drifting, changing their angle shouldn't change drift angle
 }
 
 func NewPlayer(game *GameScene) *Player {
@@ -105,6 +108,7 @@ func NewPlayer(game *GameScene) *Player {
 		shieldIndicators:    shieldIndicators,
 		hyperSpaceIndicator: NewHyperSpaceIndicator(Vector{X: 37.0, Y: 95.0}), // found by trail an error
 		hyperSpaceTimer:     nil,
+		driftTimer:          nil,
 	}
 	p.collisionObj.SetPosition(pos.X, pos.Y)
 	p.collisionObj.Tags().Set(TagPlayer)
@@ -144,6 +148,9 @@ func (p *Player) Update() {
 	p.reverse()
 	p.isDoneReversing()
 
+	p.isPlayerDrifting()
+	p.isDoneDrifting()
+
 	p.updateExhaustSprite()
 	p.useShield()
 
@@ -162,6 +169,27 @@ func (p *Player) Update() {
 func (p *Player) isPlayerDead() {
 	if p.isDead {
 		p.game._isPlayerDead = true
+	}
+}
+
+func (p *Player) isPlayerDrifting() {
+	if p.driftTimer != nil {
+		p.keepOnScreen()
+
+		p.driftTimer.Update()
+		decelerationSpeed := p.velocity / float64(ebiten.TPS()) * 2
+
+		p.position.X += math.Sin(p.driftAngle) * decelerationSpeed
+		p.position.Y += -math.Cos(p.driftAngle) * decelerationSpeed
+		p.collisionObj.SetPosition(p.position.X, p.position.Y)
+	}
+
+}
+
+func (p *Player) isDoneDrifting() {
+	if p.driftTimer != nil && p.driftTimer.IsReady() {
+		p.driftTimer = nil
+		p.velocity = 0
 	}
 }
 
@@ -234,6 +262,7 @@ func (p *Player) fireLasers() {
 
 func (p *Player) accelerate() {
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
+		p.driftTimer = nil
 		p.keepOnScreen()
 
 		if curtAcceleration < maxForwardAcceleration {
@@ -277,11 +306,26 @@ func (p *Player) isDoneAccelerating() {
 		if p.game.thrustPlayer.IsPlaying() {
 			p.game.thrustPlayer.Pause()
 		}
+
+		// Figure out velocity
+		if p.velocity < curtAcceleration*10 {
+			p.velocity = curtAcceleration*10 - 5.0
+		}
+		if p.velocity < 0 {
+			p.velocity = 0
+		}
+
+		// Otherwise they would still accelerate?
+		curtAcceleration = 0
+
+		p.driftTimer = NewTimer(driftTime)
+		p.driftAngle = p.rotation
 	}
 }
 
 func (p *Player) reverse() {
 	if ebiten.IsKeyPressed(ebiten.KeyDown) {
+		p.driftTimer = nil
 		p.keepOnScreen()
 
 		dx := -math.Sin(p.rotation) * maxReverseAcceleration

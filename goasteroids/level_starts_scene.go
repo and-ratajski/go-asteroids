@@ -19,20 +19,20 @@ type LevelStartsScene struct {
 func (lss *LevelStartsScene) Draw(screen *ebiten.Image) {
 	for _, s := range lss.stars {
 		s.Draw(screen)
-
-		text2Draw := fmt.Sprintf("LEVEL %d", lss.gameScene.currentLevel)
-		op := &text.DrawOptions{
-			LayoutOptions: text.LayoutOptions{
-				PrimaryAlign: text.AlignCenter,
-			},
-		}
-		op.ColorScale.ScaleWithColor(color.White)
-		op.GeoM.Translate(ScreenWidth/2, ScreenHeight/2)
-		text.Draw(screen, text2Draw, &text.GoTextFace{
-			Source: assets.TitleFont,
-			Size:   48,
-		}, op)
 	}
+	text2Draw := fmt.Sprintf("LEVEL %d", lss.gameScene.currentLevel)
+	op := &text.DrawOptions{
+		LayoutOptions: text.LayoutOptions{
+			PrimaryAlign: text.AlignCenter,
+		},
+	}
+	op.ColorScale.ScaleWithColor(color.White)
+	op.GeoM.Translate(ScreenWidth/2, ScreenHeight/2)
+	text.Draw(screen, text2Draw, &text.GoTextFace{
+		Source: assets.TitleFont,
+		Size:   48,
+	}, op)
+
 }
 
 func (lss *LevelStartsScene) Update(state *State) error {
