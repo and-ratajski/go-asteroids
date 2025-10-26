@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	laserSpeedPerSecond = 1000.0
+	laserSpeedPerSecond      = 1000.0
+	alienLaserSpeedPerSecond = 1000.0
 )
 
 type Laser struct {
@@ -23,7 +24,6 @@ type Laser struct {
 func NewLaser(g *GameScene, pos Vector, rotation float64, index int) *Laser {
 	sprite := assets.LaserSprite
 
-	// Position X & Y coordinates from the center of the sprite.
 	bounds := sprite.Bounds()
 	halfW := float64(bounds.Dx() / 2)
 	halfH := float64(bounds.Dy() / 2)
@@ -36,7 +36,7 @@ func NewLaser(g *GameScene, pos Vector, rotation float64, index int) *Laser {
 		position:     pos,
 		rotation:     rotation,
 		sprite:       sprite,
-		collisionObj: resolv.NewRectangle(pos.X, pos.Y, float64(sprite.Bounds().Dx()), float64(sprite.Bounds().Dy())),
+		collisionObj: resolv.NewRectangle(pos.X, pos.Y, float64(bounds.Dx()), float64(bounds.Dy())),
 	}
 
 	l.collisionObj.SetPosition(pos.X, pos.Y)
@@ -50,7 +50,7 @@ func (l *Laser) Update() {
 	// How fast should the laser go.
 	speed := laserSpeedPerSecond / float64(ebiten.TPS())
 	dx := math.Sin(l.rotation) * speed
-	dy := math.Cos(l.rotation) * -speed
+	dy := -math.Cos(l.rotation) * speed
 
 	l.position.X += dx
 	l.position.Y += dy
@@ -69,6 +69,5 @@ func (l *Laser) Draw(screen *ebiten.Image) {
 	op.GeoM.Translate(halfW, halfH)
 
 	op.GeoM.Translate(l.position.X, l.position.Y)
-
 	screen.DrawImage(l.sprite, op)
 }

@@ -71,6 +71,7 @@ func (o *GameOverScene) Update(state *State) error {
 	// Check to see if spacebar is pressed
 	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 		o.gameScene.Reset()
+		o.gameScene.currentLevel = 1
 		state.SceneManager.GoToScene(o.gameScene)
 	}
 
