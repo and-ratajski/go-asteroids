@@ -1,0 +1,15 @@
+<!doctype html>
+<script src="wasm_exec.js"></script>
+<script>
+    if (!WebAssembly.instantiateStreaming) {
+        WebAssembly.instantiateStreaming = async (res, importObj) => {
+            const source = await (await res).arrayBuffer();
+            return await WebAssembly.instantiate(source, importObj);
+        };
+    }
+
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("go-asteroids.wasm"), go.importObject).then(result => {
+        go.run(result.instance);
+    })
+</script>

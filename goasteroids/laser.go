@@ -9,8 +9,7 @@ import (
 )
 
 const (
-	laserSpeedPerSecond      = 1000.0
-	alienLaserSpeedPerSecond = 1000.0
+	laserSpeedPerSecond = 1000.0
 )
 
 type Laser struct {

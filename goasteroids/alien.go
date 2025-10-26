@@ -74,7 +74,7 @@ func NewAlien(baseVelocity float64, g *GameScene) *Alien {
 		}
 		alien.collisionObj.SetPosition(pos.X, pos.Y)
 	case 2:
-		// Intelligent one
+		// Intelligent one that comes in the middle of the screen
 		middle := Vector{
 			X: ScreenWidth / 2,
 			Y: ScreenHeight / 2,
