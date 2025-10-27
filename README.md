@@ -1,8 +1,8 @@
 # 🚀 Asteroids Game
 
-## Remake of an good and old asteroids game in GO 
+## A remake of an old, good asteroids game in GO
 
-![img_2.png](img_2.png)
+![img.png](img.png)
 
 ## How to Play
 
@@ -13,19 +13,25 @@
 
 ## How to Launch
 
-### 1. On your machine
+### 1. Play Online
+
+**🎮 [Play the game here!](https://and-ratajski.github.io/go-asteroids/)** 
+
+### 2. On your machine
 
 ```shell
 make run
 ```
 
-### 2. In the browser
+### 3. In the browser locally
 
 ```shell
-make build-wasm
-make serve
+make serve-wasm
 ```
+
+Then open `http://localhost:4000` in your browser.
 
 ---
 
 Checkout [Makefile](./Makefile) for more commands
+

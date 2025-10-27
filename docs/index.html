@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>Go Asteroids, Go!</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            padding: 0.5rem 1rem;
+            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+            border-bottom: 2px solid #333;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+            margin-bottom: 0.25rem;
+        }
+
+        .controls {
+            font-size: 0.75rem;
+            color: #888;
+            line-height: 1.2;
+        }
+
+        .controls span {
+            margin: 0 0.5rem;
+            display: inline-block;
+        }
+
+        /* Style the Ebiten canvas that gets auto-created */
+        canvas {
+            display: block !important;
+            margin: auto !important;
+            max-width: 100% !important;
+            max-height: calc(100vh - 85px) !important;
+            object-fit: contain !important;
+        }
+
+        #loading {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #00ff00;
+            padding: 2rem;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .error {
+            color: #ff0000;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.2rem;
+                letter-spacing: 0.1em;
+            }
+            .controls {
+                font-size: 0.65rem;
+            }
+            .controls span {
+                margin: 0 0.25rem;
+            }
+            canvas {
+                max-height: calc(100vh - 70px) !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Go Asteroids, Go! 🚀</h1>
+        <div class="controls">
+            <span>Move: ⬅️⬆️⬇️➡️</span>
+            <span>Fire: SPACE</span>
+            <span>Shield: S</span>
+            <span>HyperSpace: H</span>
+        </div>
+    </div>
+
+    <div id="loading">Loading game</div>
+
+    <script src="wasm_exec.js"></script>
+    <script>
+        // Polyfill for browsers that don't support instantiateStreaming
+        if (!WebAssembly.instantiateStreaming) {
+            WebAssembly.instantiateStreaming = async (resp, importObject) => {
+                const source = await (await resp).arrayBuffer();
+                return await WebAssembly.instantiate(source, importObject);
+            };
+        }
+
+        const loadingEl = document.getElementById('loading');
+
+        // Initialize Go WASM
+        const go = new Go();
+
+        // Load and run the WASM module
+        WebAssembly.instantiateStreaming(fetch("go-asteroids.wasm"), go.importObject)
+            .then(result => {
+                // Hide loading message
+                if (loadingEl) loadingEl.style.display = 'none';
+
+                // Run the game - Ebiten will create its own canvas and append to body
+                go.run(result.instance);
+            })
+            .catch(err => {
+                if (loadingEl) {
+                    loadingEl.className = 'error';
+                    loadingEl.innerHTML = `Failed to load game: ${err.message}<br><br>Please refresh the page.`;
+                }
+                console.error('WASM loading error:', err);
+            });
+    </script>
+</body>
+</html>

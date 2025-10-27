@@ -1,10 +1,11 @@
-.PHONY: build-local build-wasm applify run dmg serve clean
+.PHONY: build-local build-wasm applify run dmg serve-wasm serve-pages clean deploy-pages
 
 build-local:
 	@go build -o dist/go-asteroids .
+	@echo "✅ Local build complete! Files ready in dist/"
 
 build-wasm:
-	@sh -c 'GOOS=js GOARCH=wasm go build -o wasm/go-asteroids.wasm .'
+	@GOOS=js GOARCH=wasm go build -ldflags="-s -w" -trimpath -o wasm/go-asteroids.wasm .
 
 # Need to install it first, see https://github.com/machinebox/appify
 applify:
@@ -20,8 +21,17 @@ dmg:
 	@rm -f dist/go-asteroids
 	@hdiutil create -volname "Go Asteroids" -srcfolder dist -ov -format UDZO Asteroids.dmg
 
-serve:
+serve-wasm:
+	@make build-wasm
 	@sh -c 'cd wasm && python3 -m http.server 4000'
+
+serve-pages:
+	@make build-wasm
+	@cp wasm/go-asteroids.wasm docs/
+	@sh -c 'cd docs && python3 -m http.server 4000'
+
+deploy-pages:
+	@GOOS=js GOARCH=wasm go build -ldflags="-s -w" -trimpath -o docs/go-asteroids.wasm .
 
 clean:
 	@go clean

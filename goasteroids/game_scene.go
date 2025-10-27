@@ -23,7 +23,7 @@ const (
 	cleanupExplosionTime  = 200 * time.Millisecond
 	playerDyingFrames     = 12
 	baseBeatWaitTime      = 1600
-	numberOfStars         = 1000
+	numberOfStars         = 750
 	maxNumberOfAliens     = 1
 	alienAttackTime       = 3 * time.Second
 	alienSpawnTime        = 6 * time.Second
@@ -71,6 +71,13 @@ type GameScene struct {
 	alienLasers          map[int]*Laser
 	alienLaserCount      int
 	alienLaserPlayer     *audio.Player
+	// Cache for text rendering to reduce string formatting overhead
+	cachedScoreText     string
+	cachedHighScoreText string
+	cachedLevelText     string
+	lastScore           int
+	lastHighScore       int
+	lastLevel           int
 }
 
 func NewGameScene() *GameScene {
@@ -225,8 +232,11 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 		al.Draw(screen)
 	}
 
-	// Draw the score and the high score
-	text2Draw := fmt.Sprintf("%06d", g.score)
+	// Draw the score and the high score (with caching to reduce string formatting overhead)
+	if g.score != g.lastScore {
+		g.cachedScoreText = fmt.Sprintf("%06d", g.score)
+		g.lastScore = g.score
+	}
 	op := &text.DrawOptions{
 		LayoutOptions: text.LayoutOptions{
 			PrimaryAlign: text.AlignCenter,
@@ -234,7 +244,7 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 	}
 	op.ColorScale.ScaleWithColor(color.White)
 	op.GeoM.Translate(ScreenWidth/2, 40)
-	text.Draw(screen, text2Draw, &text.GoTextFace{
+	text.Draw(screen, g.cachedScoreText, &text.GoTextFace{
 		Source: assets.ScoreFont,
 		Size:   24,
 	}, op)
@@ -242,7 +252,10 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 	if g.score >= highScore {
 		highScore = g.score
 	}
-	text2Draw = fmt.Sprintf("HIGH SCORE %06d", highScore)
+	if highScore != g.lastHighScore {
+		g.cachedHighScoreText = fmt.Sprintf("HIGH SCORE %06d", highScore)
+		g.lastHighScore = highScore
+	}
 	op = &text.DrawOptions{
 		LayoutOptions: text.LayoutOptions{
 			PrimaryAlign: text.AlignCenter,
@@ -250,13 +263,16 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 	}
 	op.ColorScale.ScaleWithColor(color.White)
 	op.GeoM.Translate(ScreenWidth/2, 75)
-	text.Draw(screen, text2Draw, &text.GoTextFace{
+	text.Draw(screen, g.cachedHighScoreText, &text.GoTextFace{
 		Source: assets.ScoreFont,
 		Size:   16,
 	}, op)
 
-	// Draw current level
-	text2Draw = fmt.Sprintf("LEVEL %d", g.currentLevel)
+	// Draw current level (with caching)
+	if g.currentLevel != g.lastLevel {
+		g.cachedLevelText = fmt.Sprintf("LEVEL %d", g.currentLevel)
+		g.lastLevel = g.currentLevel
+	}
 	op = &text.DrawOptions{
 		LayoutOptions: text.LayoutOptions{
 			PrimaryAlign: text.AlignCenter,
@@ -264,7 +280,7 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 	}
 	op.ColorScale.ScaleWithColor(color.White)
 	op.GeoM.Translate(ScreenWidth/2, ScreenHeight-40)
-	text.Draw(screen, text2Draw, &text.GoTextFace{
+	text.Draw(screen, g.cachedLevelText, &text.GoTextFace{
 		Source: assets.LevelFont,
 		Size:   16,
 	}, op)
